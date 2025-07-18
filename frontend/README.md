@@ -1,3 +1,14 @@
+# Notes-hive Frontend
+
+## Cloudinary Integration
+
+- PDF files are now stored on Cloudinary via the backend.
+- The backend requires the following environment variables in `.env`:
+  - `CLOUDINARY_CLOUD_NAME`
+  - `CLOUDINARY_API_KEY`
+  - `CLOUDINARY_API_SECRET`
+- The backend will store only metadata and Cloudinary URLs in MongoDB.
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

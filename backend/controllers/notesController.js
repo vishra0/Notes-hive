@@ -1,27 +1,18 @@
 const Note = require('../models/Note');
-const path = require('path');
-const fs = require('fs');
 
-// Helper function to get the correct file path
-const getFilePath = (filePath) => {
-  // If the path is already absolute, return it
-  if (path.isAbsolute(filePath)) {
-    return filePath;
-  }
-  // Otherwise, construct the path relative to the backend directory
-  return path.join(__dirname, '..', filePath);
-};
-
+// Upload Note (Cloudinary handles file storage)
 exports.uploadNote = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'Please upload a PDF file' });
+      return res.status(400).json({ message: 'Please upload a PDF file.' });
     }
 
     const { title, description, university, degree, semester, subject } = req.body;
 
-    // Store the relative path from the uploads directory
-    const relativePath = path.join('uploads', path.basename(req.file.path));
+    // Cloudinary metadata
+    const fileUrl = req.file.path;                 // Cloudinary-hosted URL
+    const fileName = req.file.originalname;        // Original file name
+    const fileSize = req.file.size;                // Size in bytes
 
     const note = await Note.create({
       title,
@@ -30,9 +21,9 @@ exports.uploadNote = async (req, res) => {
       degree,
       semester,
       subject,
-      fileName: req.file.originalname,
-      filePath: relativePath,
-      fileSize: req.file.size,
+      fileName,
+      fileUrl,
+      fileSize,
       uploadedBy: req.user._id
     });
 
@@ -40,25 +31,28 @@ exports.uploadNote = async (req, res) => {
 
     res.status(201).json({
       success: true,
+      message: 'Note uploaded successfully.',
       note
     });
+
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Server Error: ' + error.message });
   }
 };
 
+// Get all notes (with optional filters)
 exports.getNotes = async (req, res) => {
   try {
     const { university, degree, semester, subject, search } = req.query;
-    
-    let filter = {};
-    
+
+    const filter = {};
+
     if (university) filter.university = new RegExp(university, 'i');
     if (degree) filter.degree = new RegExp(degree, 'i');
     if (semester) filter.semester = new RegExp(semester, 'i');
     if (subject) filter.subject = new RegExp(subject, 'i');
-    
+
     if (search) {
       filter.$or = [
         { title: new RegExp(search, 'i') },
@@ -76,60 +70,35 @@ exports.getNotes = async (req, res) => {
       count: notes.length,
       notes
     });
+
   } catch (error) {
     console.error('Get notes error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Server Error: ' + error.message });
   }
 };
 
+// Download Note (redirect to Cloudinary URL + increment download count)
 exports.downloadNote = async (req, res) => {
   try {
-    console.log('Download request for note:', req.params.id);
-    
     const note = await Note.findById(req.params.id);
-    
+
     if (!note) {
-      console.log('Note not found:', req.params.id);
-      return res.status(404).json({ message: 'Note not found' });
+      return res.status(404).json({ message: 'Note not found.' });
     }
 
-    // Get the correct file path
-    const filePath = getFilePath(note.filePath);
-    console.log('Looking for file at:', filePath);
-    
-    if (!fs.existsSync(filePath)) {
-      console.log('File not found at path:', filePath);
-      return res.status(404).json({ message: 'File not found' });
-    }
-
-    // Increment download count
     note.downloads += 1;
     await note.save();
-    console.log('Download count incremented for note:', note._id);
 
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${note.fileName}"`);
-    
-    // Stream the file
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-
-    // Handle stream errors
-    fileStream.on('error', (error) => {
-      console.error('Error streaming file:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ message: 'Error streaming file' });
-      }
-    });
+    return res.redirect(note.fileUrl);
   } catch (error) {
     console.error('Download error:', error);
     if (!res.headersSent) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: 'Server Error: ' + error.message });
     }
   }
 };
 
+// Fetch dropdown filter options for frontend
 exports.getFilterOptions = async (req, res) => {
   try {
     const universities = await Note.distinct('university');
@@ -146,8 +115,9 @@ exports.getFilterOptions = async (req, res) => {
         subjects
       }
     });
+
   } catch (error) {
     console.error('Get filter options error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Server Error: ' + error.message });
   }
 };

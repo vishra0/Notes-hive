@@ -7,7 +7,7 @@ const Navbar = ({ onShowAuth, onShowUpload }) => {
   return (
     <nav className="navbar">
       <div className="nav-container">
-        <h1 className="nav-logo"> ⬢⬡⬢⬡ 📓NOTES HIVE ⬢⬡⬢⬡</h1>
+        <h1 className="nav-logo"> ⬢⬡⬢⬡ NOTES HIVE ⬢⬡⬢⬡</h1>
         <div className="nav-menu">
           {isAuthenticated ? (
             <>

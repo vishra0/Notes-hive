@@ -1,23 +1,35 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
+require('dotenv').config();
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+// Helper: sanitize filename to remove special characters
+const sanitizeFilename = (name) => {
+  return name
+    .replace(/\.[^/.]+$/, '')             // remove extension
+    .replace(/[^a-zA-Z0-9-_]/g, '-')      // replace special chars with dashes
+    .toLowerCase();
+};
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'notes-pdfs',
+    format: async () => 'pdf',
+    public_id: (req, file) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const cleanName = sanitizeFilename(file.originalname);
+      return `${uniqueSuffix}-${cleanName}`;
+    },
+    resource_type: 'raw', // for non-image files
   },
-  filename: function (req, file, cb) {
-    // Create a unique filename with original extension
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, uniqueSuffix + ext);
-  }
 });
 
 const fileFilter = (req, file, cb) => {

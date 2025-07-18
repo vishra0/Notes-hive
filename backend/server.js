@@ -22,6 +22,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// Legacy: /uploads is not needed for Cloudinary, but kept for backward compatibility.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes

@@ -30,35 +30,44 @@ const NoteCard = ({ note }) => {
       const token = localStorage.getItem('token');
       console.log('Using token:', token ? 'Token exists' : 'No token');
 
-      const response = await api.get(`/api/notes/download/${note._id}`, {
-        responseType: 'blob',
+      // Use fetch to handle redirects
+      const res = await fetch(`${api.defaults.baseURL}/api/notes/download/${note._id}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        redirect: 'follow',
       });
-      
-      console.log('Download response received:', response.status);
-      
-      // Check if the response is actually a PDF
-      if (response.data.type !== 'application/pdf') {
-        throw new Error('Invalid file type received');
+
+      // If redirected, open the redirected URL (Cloudinary) in a new tab
+      if (res.redirected && res.url && res.url !== window.location.href) {
+        window.open(res.url, '_blank');
+        return;
       }
 
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', note.fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      // Otherwise, fallback to blob download (for local dev)
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob.type !== 'application/pdf') {
+          throw new Error('Invalid file type received');
+        }
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', note.fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Download failed');
+      }
     } catch (error) {
       console.error('Download error:', {
         message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
       });
-      alert('Download failed: ' + (error.response?.data?.message || 'Please try again.'));
+      alert('Download failed: ' + (error.message || 'Please try again.'));
     }
   };
 
@@ -88,7 +97,7 @@ const NoteCard = ({ note }) => {
         <span className="file-info">
           📄 {note.fileName} ({formatFileSize(note.fileSize)})
         </span>
-        <span className="download-count">⬇️ {note.downloads} downloads</span>
+        <span className="download-count"> </span>
       </div>
       
       <div className="note-footer">
